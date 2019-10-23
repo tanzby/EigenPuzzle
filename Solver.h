@@ -9,6 +9,9 @@
 #include <stack>
 #include <utility>
 #include <unordered_map>
+#include <memory>
+#include <algorithm>
+
 #include "Puzzle.hpp"
 
 class Greedy: public Puzzle::Solver
@@ -324,6 +327,9 @@ public:
         for(int depth = 1; depth < max_depth; ++depth)
         {
             std::stack<NodePtr> s;
+            std::unordered_map<int, bool> has_visit;
+            has_visit[puzzle->getSourceState().getHash()] = true;
+
             s.push(root);
             num_count = 0;
 
@@ -332,7 +338,6 @@ public:
                 num_count++;
 
                 auto node = s.top();
-
                 s.pop();
 
                 if (puzzle->getStateCost(node->state,State::Binary) < 1.0)
@@ -352,9 +357,14 @@ public:
 
                 auto actions = puzzle->getActions(node->state);
 
+                bool end_node = false;
                 for(auto& act: actions)
                 {
                     auto new_state = node->state.executeAction(act);
+
+                    int current_hash = node->state.tryActionAndGetHash(act);
+                    if (has_visit[current_hash]!=0) continue;
+                    has_visit[current_hash]=true;
 
                     float act_cost = puzzle->getStateCost(new_state);
 

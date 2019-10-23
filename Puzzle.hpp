@@ -4,6 +4,8 @@
 #include <cmath>
 #include <vector>
 #include <ctime>
+#include <cassert>
+#include <cstring>
 
 struct Action
 {
