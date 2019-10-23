@@ -21,6 +21,7 @@ void basic_test()
     Greedy greedy;
     AStar  aStart;
     IDS    ids;
+    BFS    bfs;
 
     for(int i = 0; i < states.size(); ++i)
     {
@@ -45,7 +46,7 @@ void basic_test()
         puzzle.Solve(&aStart);
 
         // puzzle.Solve(&bfs);
-
+        puzzle.Solve(&bfs);
         puzzle.Solve(&ids);
         printf("\n----------------------------------------------------------------------\n");
     }
@@ -114,7 +115,7 @@ int main()
 
     basic_test();
 
-    random_test();
+    // random_test();
 
     return 0;
 }

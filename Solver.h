@@ -73,8 +73,10 @@ public:
         q.push(std::make_shared<Node>(puzzle->getStateCost(puzzle->getSourceState()),
                                       puzzle->getSourceState(), Action()));
 
+        int node_count = 0;
         while(!q.empty())
         {
+            node_count++;
             auto node = q.top();
             q.pop();
 
@@ -106,6 +108,7 @@ public:
                 q.push(new_node);
             }
         }
+        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -171,8 +174,11 @@ public:
         q.push(std::make_shared<Node>(0, puzzle->getStateCost(puzzle->getSourceState()),
                 puzzle->getSourceState(), Action()));
 
+        int node_count = 0;
         while(!q.empty())
         {
+            node_count++;
+
             auto node = q.top();
             q.pop();
 
@@ -204,6 +210,8 @@ public:
                 q.push(new_node);
             }
         }
+
+        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -239,8 +247,10 @@ public:
 
         q.push(std::make_shared<Node>(0, puzzle->getSourceState(), Action()));
 
+        int node_count = 0;
         while(!q.empty())
         {
+            node_count++;
             auto node = q.front();
             q.pop();
 
@@ -252,6 +262,7 @@ public:
                     action_list.emplace_back(cur->action);
                     cur = cur->prev_node_ptr.get();
                 }
+
                 std::reverse(action_list.begin(),action_list.end());
                 break;
             }
@@ -272,6 +283,7 @@ public:
                 q.push(new_node);
             }
         }
+        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -290,54 +302,6 @@ class IDS: public Puzzle::Solver
                 g_cost(g), state(state), action(action){}
     };
 
-    PuzzlePtr puzzle = nullptr;
-
-    std::vector<Action>* action_list_ptr;
-
-    std::unordered_map<int, bool> has_visit;
-
-    bool DFS(const NodePtr& node, int depth)
-    {
-        if (puzzle->getStateCost(node->state,State::Binary) < 1.0)
-        {
-            std::vector<Action>& action_list = *action_list_ptr;
-            Node * cur = node.get();
-            while(cur->prev_node_ptr!= nullptr)
-            {
-                action_list.emplace_back(cur->action);
-                cur = cur->prev_node_ptr.get();
-            }
-            std::reverse(action_list.begin(),action_list.end());
-            return true;
-        }
-
-        if ( depth < 1 ) return false;
-
-        auto actions = puzzle->getActions(node->state);
-
-        for(auto& act: actions)
-        {
-            int current_hash = node->state.tryActionAndGetHash(act);
-            if (has_visit[current_hash]!=0) continue;
-            has_visit[current_hash]=true;
-
-            auto new_state = node->state.executeAction(act);
-            float act_cost = puzzle->getStateCost(new_state);
-
-            NodePtr new_node = std::make_shared<Node>(node->g_cost+1, new_state, act);
-
-            new_node->prev_node_ptr = node;
-
-            if (DFS(new_node, depth-1))
-            {
-                return true;
-            }
-
-            has_visit[current_hash] = false;
-        }
-
-        return false;
-    }
 
 public:
 
@@ -348,23 +312,66 @@ public:
 
     void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) override
     {
-        this->puzzle = puzzle;
-        this->action_list_ptr = & action_list;
 
         int max_depth  = 30;
 
-        NodePtr root = std::make_shared<Node>(0,puzzle->getSourceState(),Action());
+        NodePtr root(new Node(0,puzzle->getSourceState(),Action()));
+
+        root->prev_node_ptr = nullptr;
+
+        int num_count = 0;
 
         for(int depth = 1; depth < max_depth; ++depth)
         {
-            has_visit.clear();
-            has_visit[root->state.getHash()] = true;
+            std::stack<NodePtr> s;
+            s.push(root);
+            num_count = 0;
 
-            if (DFS(root,depth))
+            while(!s.empty())
             {
-                break;
+                num_count++;
+
+                auto node = s.top();
+
+                s.pop();
+
+                if (puzzle->getStateCost(node->state,State::Binary) < 1.0)
+                {
+                    Node * cur = node.get();
+                    while(cur->prev_node_ptr!= nullptr)
+                    {
+                        action_list.emplace_back(cur->action);
+                        cur = cur->prev_node_ptr.get();
+                    }
+                    std::reverse(action_list.begin(),action_list.end());
+                    depth = max_depth;
+                    break;
+                }
+
+                if ( node->g_cost >= depth ) continue;
+
+                auto actions = puzzle->getActions(node->state);
+
+                for(auto& act: actions)
+                {
+                    auto new_state = node->state.executeAction(act);
+
+                    float act_cost = puzzle->getStateCost(new_state);
+
+                    if (node->prev_node_ptr && node->prev_node_ptr->state.getHash()
+                        == new_state.getHash()) continue;
+
+                    NodePtr new_node(new Node(node->g_cost+1, new_state, act));
+
+                    new_node->prev_node_ptr = node;
+
+                    s.push(new_node);
+                }
+
             }
         }
+
+        std::cout <<"\nnode count: "<< num_count << std::endl;
     }
 };
 

@@ -327,7 +327,7 @@ public:
         }
     }
 
-    double Solve(Solver* solver)
+    double Solve(Solver* solver, bool print_result=false)
     {
         assert(solver!= nullptr);
 
@@ -340,9 +340,9 @@ public:
 
         double end_time=(double)(end_t-start_t)/1000;
 
-        printf("Total runtime for %20s : %10.4fms, \twith %3ld steps.\n",solver->getName().c_str(), end_time, action_list.size());
+        printf("Total runtime for %25s : %10.4fms, \twith %3ld steps.\n",solver->getName().c_str(), end_time, action_list.size());
 
-        // printActions(init_state_, action_list);
+        if (print_result) printActions(getSourceState(), action_list);
 
         return end_time;
     }
