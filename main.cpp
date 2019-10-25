@@ -26,10 +26,10 @@ void basic_test()
     for(int i = 0; i < states.size(); ++i)
     {
         auto& state = states[i];
-
         puzzle.setState(target_state, state);
 
-        printf("\n------------------------------  task %2d  -----------------------------\n\n", i+1);
+        printf("\n--------------------------------------------------  "
+               "task %2d  -------------------------------------------------\n\n", i+1);
 
         greedy.setHeuristicType(State::Manhattan);
         puzzle.Solve(&greedy);
@@ -45,10 +45,15 @@ void basic_test()
         aStart.setHeuristicType(State::OneHot);
         puzzle.Solve(&aStart);
 
-        // puzzle.Solve(&bfs);
-        puzzle.Solve(&bfs);
+        ids.enableHeuristic(false);
         puzzle.Solve(&ids);
-        printf("\n----------------------------------------------------------------------\n");
+        ids.enableHeuristic(true);
+        puzzle.Solve(&ids);
+
+        puzzle.Solve(&bfs);
+
+        printf("\n----------------------------------------------------"
+               "----------------------------------------------------------\n");
     }
 }
 
@@ -58,15 +63,15 @@ void random_test(int random_size = 200)
 
     State target_state({1,2,3,4,5,6,7,8,0});
 
-    std::vector<int> basic_vec {1,2,3,4,5,6,7,8,0};
     std::vector<State> random_test_set;
+
+    std::vector<int> basic_vec {1,2,3,4,5,6,7,8,0};
     std::default_random_engine e(time(nullptr));
     while(random_test_set.size()<random_size)
     {
         std::shuffle(basic_vec.begin(),basic_vec.end(), e);
         State new_state (basic_vec);
-        if (target_state.check_if_solvable(new_state))
-        {
+        if (target_state.check_if_solvable(new_state)){
             random_test_set.emplace_back(new_state);
         }
     }
@@ -106,13 +111,11 @@ void random_test(int random_size = 200)
     {
         std::cout << name <<": " << time / random_size << std::endl;
     }
-
 }
 
 
 int main()
 {
-
     basic_test();
 
     // random_test();

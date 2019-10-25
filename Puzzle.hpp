@@ -67,13 +67,13 @@ public:
         computeHash();
     }
 
-    const int& operator [](int i) const {
+    inline const int& operator [](int i) const {
         return cells_[i/WIDTH][i%WIDTH];
     }
-    const int& operator () (int r, int c) const {
+    inline const int& operator () (int r, int c) const {
         return cells_[r][c];
     }
-    int& operator () (int r, int c) {
+    inline int& operator () (int r, int c) {
         return cells_[r][c];
     }
 
@@ -271,7 +271,7 @@ public:
     {
     public:
         virtual std::string getName() = 0;
-        virtual void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) = 0;
+        virtual void compute(PuzzlePtr puzzle, std::vector<Action>& action_list, int& node_num) = 0;
     };
 
     void setState(const State& target, const State& source)
@@ -280,6 +280,11 @@ public:
         source_state_ = source;
 
         assert(source.check_if_solvable(target));
+    }
+
+    inline bool isGoal(const State& state)
+    {
+        return getStateCost(state,State::Binary) < 1.f;
     }
 
     inline const State& getSourceState() const
@@ -305,12 +310,14 @@ public:
             {
                 if (state(r,c) == 0)
                 {
-                    for (int i = 0; i < 4; ++i)
+                    for (auto & i : d)
                     {
-                        if (r+d[i][0] < 0 || c+d[i][1] < 0 || r+d[i][0]>=WIDTH || c+d[i][1]>=WIDTH) continue;
+                        if (r+i[0] < 0 || c+i[1] < 0 || r+i[0]>=WIDTH || c+i[1]>=WIDTH) continue;
 
-                        actions.emplace_back(r+d[i][0],c+d[i][1],-d[i][0],-d[i][1]);
+                        actions.emplace_back(r+i[0],c+i[1],-i[0],-i[1]);
                     }
+                    r = WIDTH;
+                    break;
                 }
             }
         }
@@ -335,14 +342,17 @@ public:
 
         auto start_t =clock();
 
+        int node_sum = 0;
         std::vector<Action> action_list;
-        solver->compute(this, action_list);
 
-        auto end_t =clock();
+        solver->compute(this, action_list, node_sum);
+
+        auto end_t = clock();
 
         double end_time=(double)(end_t-start_t)/1000;
 
-        printf("Total runtime for %25s : %10.4fms, \twith %3ld steps.\n",solver->getName().c_str(), end_time, action_list.size());
+        printf("\tTotal runtime for %25s : %10.4fms, \tnode sum: %7d, \twith %3ld steps.\n",
+                solver->getName().c_str(), end_time, node_sum, action_list.size());
 
         if (print_result) printActions(getSourceState(), action_list);
 

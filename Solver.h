@@ -66,20 +66,19 @@ public:
         }
     }
 
-    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) override
+    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list, int& node_sum) override
     {
         std::priority_queue<NodePtr, std::vector<NodePtr>, NodePtrCmp> q;
 
-        std::unordered_map<int, bool> has_visit;
-        has_visit[puzzle->getSourceState().getHash()] = true;
+        std::unordered_map<int, bool> closed;
+        closed[puzzle->getSourceState().getHash()] = true;
 
         q.push(std::make_shared<Node>(puzzle->getStateCost(puzzle->getSourceState()),
                                       puzzle->getSourceState(), Action()));
 
-        int node_count = 0;
         while(!q.empty())
         {
-            node_count++;
+            node_sum++;
             auto node = q.top();
             q.pop();
 
@@ -100,8 +99,8 @@ public:
             for(auto& act: actions)
             {
                 int current_hash = node->state.tryActionAndGetHash(act);
-                if (has_visit[current_hash]) continue;
-                has_visit[current_hash]=true;
+                if (closed[current_hash]) continue;
+                closed[current_hash]=true;
 
                 auto new_state = node->state.executeAction(act);
                 float act_cost = puzzle->getStateCost(new_state,heuristic_type);
@@ -111,7 +110,6 @@ public:
                 q.push(new_node);
             }
         }
-        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -167,20 +165,19 @@ public:
         }
     }
 
-    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) override
+    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list, int& node_sum) override
     {
         std::priority_queue<NodePtr, std::vector<NodePtr>, NodePtrCmp> q;
 
-        std::unordered_map<int, bool> has_visit;
-        has_visit[puzzle->getSourceState().getHash()] = true;
+        std::unordered_map<int, bool> closed;
+        closed[puzzle->getSourceState().getHash()] = true;
 
         q.push(std::make_shared<Node>(0, puzzle->getStateCost(puzzle->getSourceState()),
                 puzzle->getSourceState(), Action()));
 
-        int node_count = 0;
         while(!q.empty())
         {
-            node_count++;
+            node_sum++;
 
             auto node = q.top();
             q.pop();
@@ -202,8 +199,8 @@ public:
             for(auto& act: actions)
             {
                 int current_hash = node->state.tryActionAndGetHash(act);
-                if (has_visit[current_hash]) continue;
-                has_visit[current_hash]=true;
+                if (closed[current_hash]) continue;
+                closed[current_hash]=true;
 
                 auto new_state = node->state.executeAction(act);
                 float act_cost = puzzle->getStateCost(new_state, heuristic_type);
@@ -213,8 +210,6 @@ public:
                 q.push(new_node);
             }
         }
-
-        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -241,23 +236,21 @@ public:
         return "BFS";
     }
 
-    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) override
+    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list, int& node_sum) override
     {
         std::queue<NodePtr> q;
 
-        std::unordered_map<int, bool> has_visit;
-        has_visit[puzzle->getSourceState().getHash()] = true;
+        std::unordered_map<int, bool> closed;
+        closed[puzzle->getSourceState().getHash()] = true;
 
         q.push(std::make_shared<Node>(0, puzzle->getSourceState(), Action()));
 
-        int node_count = 0;
         while(!q.empty())
         {
-            node_count++;
-            auto node = q.front();
-            q.pop();
+            node_sum++;
+            auto node = q.front(); q.pop();
 
-            if (puzzle->getStateCost(node->state,State::Binary) < 1.f)
+            if (puzzle->isGoal(node->state))
             {
                 Node * cur = node.get();
                 while(cur->prev_node_ptr!= nullptr)
@@ -265,7 +258,6 @@ public:
                     action_list.emplace_back(cur->action);
                     cur = cur->prev_node_ptr.get();
                 }
-
                 std::reverse(action_list.begin(),action_list.end());
                 break;
             }
@@ -275,18 +267,15 @@ public:
             for(auto& act: actions)
             {
                 int current_hash = node->state.tryActionAndGetHash(act);
-                if (has_visit[current_hash]!=0) continue;
-                has_visit[current_hash]=true;
+                if (closed[current_hash]) continue;
+                closed[current_hash]=true;
 
                 auto new_state = node->state.executeAction(act);
-                float act_cost = puzzle->getStateCost(new_state);
-
                 auto new_node = std::make_shared<Node>(node->g_cost+1, new_state, act);
                 new_node->prev_node_ptr = node;
                 q.push(new_node);
             }
         }
-        std::cout << "\nnode count: " << node_count << std::endl;
     }
 };
 
@@ -297,91 +286,102 @@ class IDS: public Puzzle::Solver
 
     struct Node
     {
-        int g_cost = 0;
-        State state {};
+        State state;
         Action  action;
-        NodePtr prev_node_ptr{};
-        Node(int g, const State& state, const Action& action):
-                g_cost(g), state(state), action(action){}
+        NodePtr prev_node_ptr;
+        Node(const NodePtr& parent, const State& state, const Action& action):
+                prev_node_ptr(parent), state(state), action(action){}
     };
 
+    int node_count = 0;
+    PuzzlePtr  puzzle;
+    std::vector<Action>* action_list;
+    std::unordered_map<int, bool> closed;
+
+    bool enable_heuristic_;
+
+    bool dfs(const NodePtr& root, int depth)
+    {
+        node_count++;
+
+        if (enable_heuristic_)
+        {
+            if ( depth < puzzle->getStateCost(root->state, State::Manhattan) ) return false; // IDA*
+        }
+        else if ( depth < 0 ) return false;  // IDS
+
+
+        if ( puzzle->isGoal(root->state) )
+        {
+            Node * cur = root.get();
+            while(cur->prev_node_ptr!= nullptr)
+            {
+                action_list->emplace_back(cur->action);
+                cur = cur->prev_node_ptr.get();
+            }
+            std::reverse(action_list->begin(),action_list->end());
+            return true;
+        }
+
+        for(auto& act: puzzle->getActions(root->state))
+        {
+            int current_hash = root->state.tryActionAndGetHash(act);
+            if (closed[current_hash]) continue;
+
+            auto new_state = root->state.executeAction(act);
+
+            NodePtr new_node(new Node(root, new_state, act));
+
+            closed[new_state.getHash()] = true;
+
+            if (dfs(new_node, depth-1)) return true;
+
+            closed[new_state.getHash()] = false;
+        }
+        return false;
+    }
 
 public:
 
-    std::string getName() override
+    IDS()
     {
-        return "IDS";
+        enable_heuristic_ = true;
     }
 
-    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list) override
+    void enableHeuristic(bool enable)
+    {
+        enable_heuristic_ = enable;
+    }
+
+    std::string getName() override
+    {
+        return "IDS" + std::string(enable_heuristic_? " with Heuristic": " without Heuristic");
+    }
+
+    void compute(PuzzlePtr puzzle, std::vector<Action>& action_list, int& node_sum) override
     {
 
-        int max_depth  = 30;
+        this->puzzle = puzzle;
+        this->action_list = &action_list;
 
-        NodePtr root(new Node(0,puzzle->getSourceState(),Action()));
+        int max_depth  = 40;
 
-        root->prev_node_ptr = nullptr;
-
-        int num_count = 0;
+        NodePtr root(new Node(nullptr, puzzle->getSourceState(),Action()));
 
         for(int depth = 1; depth < max_depth; ++depth)
         {
-            std::stack<NodePtr> s;
-            std::unordered_map<int, bool> has_visit;
-            has_visit[puzzle->getSourceState().getHash()] = true;
+            node_count = 0;
 
-            s.push(root);
-            num_count = 0;
+            closed.clear();
+            closed[root->state.getHash()] = true;
 
-            while(!s.empty())
+            if (dfs(root, depth))
             {
-                num_count++;
-
-                auto node = s.top();
-                s.pop();
-
-                if (puzzle->getStateCost(node->state,State::Binary) < 1.0)
-                {
-                    Node * cur = node.get();
-                    while(cur->prev_node_ptr!= nullptr)
-                    {
-                        action_list.emplace_back(cur->action);
-                        cur = cur->prev_node_ptr.get();
-                    }
-                    std::reverse(action_list.begin(),action_list.end());
-                    depth = max_depth;
-                    break;
-                }
-
-                if ( node->g_cost >= depth ) continue;
-
-                auto actions = puzzle->getActions(node->state);
-
-                bool end_node = false;
-                for(auto& act: actions)
-                {
-                    auto new_state = node->state.executeAction(act);
-
-                    int current_hash = node->state.tryActionAndGetHash(act);
-                    if (has_visit[current_hash]!=0) continue;
-                    has_visit[current_hash]=true;
-
-                    float act_cost = puzzle->getStateCost(new_state);
-
-                    if (node->prev_node_ptr && node->prev_node_ptr->state.getHash()
-                        == new_state.getHash()) continue;
-
-                    NodePtr new_node(new Node(node->g_cost+1, new_state, act));
-
-                    new_node->prev_node_ptr = node;
-
-                    s.push(new_node);
-                }
-
+                break;
             }
         }
 
-        std::cout <<"\nnode count: "<< num_count << std::endl;
+        node_sum = node_count;
     }
 };
 
